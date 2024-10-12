@@ -23,7 +23,7 @@ class ChatCompletionMessage(BaseModel):
     content: Optional[str]
     role: str
     tool_calls: Optional[List[ChatCompletionMessageToolCall]]
-    
+
 class Agent(BaseModel):
     name: str
     instructions: Union[str, Callable[..., str]]

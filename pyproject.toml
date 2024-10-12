@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "microagent"
+version = "0.1.0"
+description = "A microagent framework for AI interactions"
+readme = "README.md"
+requires-python = ">=3.7"
+license = "MIT"
+keywords = ["AI", "agent", "microagent"]
+authors = [
+  { name = "Your Name", email = "your.email@example.com" },
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+  "openai>=1.0.0",
+  "anthropic>=0.3.0",
+  "google-generativeai>=0.1.0",
+  "groq>=0.4.0",
+  "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=6.0",
+  "black>=22.0",
+  "isort>=5.0",
+  "mypy>=0.900",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/microagent"
+Repository = "https://github.com/yourusername/microagent.git"
+Issues = "https://github.com/yourusername/microagent/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["microagent"]

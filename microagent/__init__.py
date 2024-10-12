@@ -1,4 +1,6 @@
-from .core import Microagent
-from .types import Agent, Response
+# microagent/__init__.py
 
-__all__ = ['Microagent', 'Agent', 'Response']
+__version__ = "0.1.0"  # or whatever your current version is
+
+from .core import Microagent
+from .types import Agent, Response, Result

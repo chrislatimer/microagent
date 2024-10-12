@@ -1,6 +1,11 @@
 import os
+import sys
 from microagent.core import Microagent
 from microagent.types import Agent
+
+print(f"Python version: {sys.version}")
+print(f"sys.path: {sys.path}")
+print(f"microagent.__file__: {__import__('microagent').__file__}")
 
 # Check if GOOGLE_API_KEY is set in the environment
 if "GOOGLE_API_KEY" not in os.environ:
