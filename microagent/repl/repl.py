@@ -1,7 +1,6 @@
 import json
-from typing import Dict, Any
-
-from swarm import Swarm
+from typing import Dict, Any, List
+from microagent import Microagent, Agent
 
 def process_and_print_streaming_response(response):
     content = ""
@@ -53,10 +52,10 @@ def pretty_print_messages(messages: List[Dict[str, Any]]) -> None:
             print(f"\033[95m{name}\033[0m({arg_str[1:-1]})")
 
 def run_demo_loop(
-    starting_agent, context_variables=None, stream=False, debug=False, llm_type='openai'
+    starting_agent: Agent, context_variables=None, stream=False, debug=False, llm_type='openai'
 ) -> None:
-    client = Swarm(llm_type=llm_type)
-    print(f"Starting Swarm CLI 🐝 using {llm_type.capitalize()} LLM")
+    client = Microagent(llm_type=llm_type)
+    print(f"Starting Microagent CLI 🤖 using {llm_type.capitalize()} LLM")
 
     messages = []
     agent = starting_agent
@@ -80,10 +79,3 @@ def run_demo_loop(
 
         messages.extend(response.messages)
         agent = response.agent
-
-if __name__ == "__main__":
-    from swarm.agents import get_default_agent
-    
-    llm_type = input("Enter LLM type (openai/anthropic/groq/gemini): ").lower()
-    agent = get_default_agent()
-    run_demo_loop(agent, stream=True, debug=True, llm_type=llm_type)

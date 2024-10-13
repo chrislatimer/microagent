@@ -29,7 +29,7 @@ class Agent(BaseModel):
     instructions: Union[str, Callable[..., str]]
     model: str
     functions: List[Callable] = []
-    tool_choice: Optional[str] = None
+    tool_choice: Optional[Union[str, Dict[str, Any]]] = None
     parallel_tool_calls: bool = True
 
 class Response(BaseModel):

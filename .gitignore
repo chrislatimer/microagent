@@ -94,3 +94,6 @@ Desktop.ini
 *.swo
 *.bak
 *~
+
+# Add this line to .gitignore
+tests/fixtures/vcr_cassettes/*.yaml

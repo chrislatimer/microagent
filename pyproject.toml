@@ -11,7 +11,7 @@ requires-python = ">=3.7"
 license = "MIT"
 keywords = ["AI", "agent", "microagent"]
 authors = [
-  { name = "Your Name", email = "your.email@example.com" },
+  { name = "Chris Latimer", email = "chris.latimer@vectorize.io" },
 ]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -38,6 +38,7 @@ dev = [
   "black>=22.0",
   "isort>=5.0",
   "mypy>=0.900",
+  "vcrpy>=4.1.1",
 ]
 
 [project.urls]

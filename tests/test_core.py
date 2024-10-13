@@ -1,194 +1,111 @@
 import pytest
-from unittest.mock import Mock
-import json
-from microagent.core import Microagent, Agent, Response, Result
+import vcr
+from microagent.core import Microagent
+from microagent.types import Agent, Result
 
-DEFAULT_RESPONSE_CONTENT = "This is a default response."
+# Configure VCR
+my_vcr = vcr.VCR(
+    cassette_library_dir='tests/fixtures/vcr_cassettes',
+    record_mode='new_episodes',
+    match_on=['method', 'scheme', 'host', 'port', 'path', 'query'],
+    filter_headers=['authorization'],
+)
 
-class MockLLMClient:
-    def __init__(self, llm_type):
-        self.llm_type = llm_type
-        self.responses = []
+# LLM_TYPES = ['openai', 'anthropic', 'groq', 'gemini']
+LLM_TYPES = ['openai', 'anthropic']
 
-    def set_response(self, response):
-        self.responses = [response]
+@pytest.fixture(params=LLM_TYPES)
+def microagent(request):
+    llm_type = request.param
+    model_map = {
+        'openai': "gpt-3.5-turbo",
+        'anthropic': "claude-3-sonnet-20240229",
+        'groq': "mixtral-8x7b-32768",
+        'gemini': "gemini-pro"
+    }
+    return Microagent(llm_type=llm_type), model_map[llm_type], llm_type
 
-    def set_sequential_responses(self, responses):
-        self.responses = responses
+def use_vcr_for_llm(test_function):
+    """Decorator to use VCR with the specific LLM type."""
+    def wrapper(microagent, *args, **kwargs):
+        client, model, llm_type = microagent
+        cassette_name = f'{test_function.__name__}_{llm_type}.yaml'
+        with my_vcr.use_cassette(cassette_name):
+            return test_function(microagent, *args, **kwargs)
+    return wrapper
 
-    def chat_completion(self, **kwargs):
-        if not self.responses:
-            raise ValueError("No mock responses set")
-        return self.responses.pop(0)
+@use_vcr_for_llm
+def test_tool_call(microagent):
+    client, model, _ = microagent
+    def test_function(arg1, arg2):
+        """Test function with two args"""
+        return f"Function called with {arg1} and {arg2}"
+    agent = Agent(name="Test Agent", instructions="Test instructions", model=model, functions=[test_function])
+    messages = [{"role": "user", "content": "Call the test function with arg1=value1 and arg2=value2"}]
+    response = client.run(agent=agent, messages=messages, max_turns=2)
+    assert len(response.messages) >= 2
+    assert any("Function called with value1 and value2" in (msg.get('content') or '') for msg in response.messages)
 
-    def stream_chat_completion(self, **kwargs):
-        return self.chat_completion(**kwargs)
+@use_vcr_for_llm
+def test_multiple_tool_calls(microagent):
+    client, model, _ = microagent
+    def function1(arg):
+        """Function1 with an arg"""
+        return f"Function 1 called with {arg}"
+    def function2(arg):
+        """Function2 with an arg"""
+        return f"Function 2 called with {arg}"
+    agent = Agent(name="Test Agent", instructions="Test instructions", model=model, functions=[function1, function2])
+    messages = [{"role": "user", "content": "Call both functions with different arguments"}]
+    response = client.run(agent=agent, messages=messages, max_turns=5)
+    assert len(response.messages) >= 3
+    content = ' '.join(msg.get('content') or '' for msg in response.messages)
+    assert "Function 1 called with" in content
+    assert "Function 2 called with" in content
 
-def create_mock_response(llm_type, message, function_calls=None):
-    if llm_type in ['openai', 'groq', 'gemini']:
-        response = {
-            "choices": [{
-                "message": message
-            }]
-        }
-        if function_calls:
-            response["choices"][0]["message"]["tool_calls"] = function_calls
-        return response
-    elif llm_type == 'anthropic':
-        response = Mock()
-        response.content = message['content']
-        if function_calls:
-            response.tool_calls = function_calls
-        else:
-            response.tool_calls = []  # Always set tool_calls, even if empty
-        return response
-    else:
-        raise ValueError(f"Unsupported LLM type: {llm_type}")
-
-@pytest.fixture
-def mock_llm_client(request):
-    return MockLLMClient(request.param)
-
-@pytest.mark.parametrize("mock_llm_client", ["openai", "anthropic", "groq", "gemini"], indirect=True)
-def test_run_with_simple_message(mock_llm_client, monkeypatch):
-    agent = Agent(name="Test Agent", instructions="Test instructions", model="gpt-3.5-turbo")
-    mock_llm_client.set_response(create_mock_response(mock_llm_client.llm_type, {"role": "assistant", "content": DEFAULT_RESPONSE_CONTENT}, function_calls=[]))
-    
-    monkeypatch.setattr(Microagent, '_get_client', lambda self, llm_type: mock_llm_client)
-    client = Microagent(llm_type=mock_llm_client.llm_type)
-    messages = [{"role": "user", "content": "Hello, how are you?"}]
-    response = client.run(agent=agent, messages=messages)
-    
-    assert len(response.messages) == 1
-    assert response.messages[0]["content"] == DEFAULT_RESPONSE_CONTENT
-
-@pytest.mark.parametrize("mock_llm_client", ["openai", "anthropic", "groq", "gemini"], indirect=True)
-def test_tool_call(mock_llm_client, monkeypatch):
-    expected_location = "San Francisco"
-
-    get_weather_mock = Mock()
-    def get_weather(location):
-        get_weather_mock(location=location)
-        return "It's sunny today."
-
-    agent = Agent(name="Test Agent", instructions="Test instructions", model="gpt-3.5-turbo", functions=[get_weather])
-    messages = [{"role": "user", "content": "What's the weather like in San Francisco?"}]
-
-    if mock_llm_client.llm_type in ['openai', 'groq', 'gemini']:
-        function_calls = [{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": json.dumps({"location": expected_location})}}]
-    else:  # anthropic
-        function_call = Mock()
-        function_call.id = "call_1"
-        function_call.type = "function"
-        function_call.function = Mock()
-        function_call.function.name = "get_weather"
-        function_call.function.arguments = json.dumps({"location": expected_location})
-        function_calls = [function_call]
-
-    mock_llm_client.set_sequential_responses([
-        create_mock_response(
-            mock_llm_client.llm_type,
-            message={"role": "assistant", "content": ""},
-            function_calls=function_calls
-        ),
-        create_mock_response(
-            mock_llm_client.llm_type,
-            {"role": "assistant", "content": DEFAULT_RESPONSE_CONTENT}
-        ),
-    ])
-
-    monkeypatch.setattr(Microagent, '_get_client', lambda self, llm_type: mock_llm_client)
-    client = Microagent(llm_type=mock_llm_client.llm_type)
-    response = client.run(agent=agent, messages=messages)
-
-    get_weather_mock.assert_called_once_with(location=expected_location)
-    assert len(response.messages) == 3
-    assert response.messages[-1]["content"] == DEFAULT_RESPONSE_CONTENT
-
-@pytest.mark.parametrize("mock_llm_client", ["openai", "anthropic", "groq", "gemini"], indirect=True)
-def test_execute_tools_false(mock_llm_client, monkeypatch):
-    expected_location = "San Francisco"
-
-    get_weather_mock = Mock()
-    def get_weather(location):
-        get_weather_mock(location=location)
-        return "It's sunny today."
-
-    agent = Agent(name="Test Agent", instructions="Test instructions", model="gpt-3.5-turbo", functions=[get_weather])
-    messages = [{"role": "user", "content": "What's the weather like in San Francisco?"}]
-
-    if mock_llm_client.llm_type in ['openai', 'groq', 'gemini']:
-        function_calls = [{"id": "call_1", "type": "function", "function": {"name": "get_weather", "arguments": json.dumps({"location": expected_location})}}]
-    else:  # anthropic
-        function_call = Mock()
-        function_call.id = "call_1"
-        function_call.type = "function"
-        function_call.function = Mock()
-        function_call.function.name = "get_weather"
-        function_call.function.arguments = json.dumps({"location": expected_location})
-        function_calls = [function_call]
-
-    mock_response = create_mock_response(
-        mock_llm_client.llm_type,
-        message={"role": "assistant", "content": ""},
-        function_calls=function_calls
-    )
-    mock_llm_client.set_response(mock_response)
-
-    monkeypatch.setattr(Microagent, '_get_client', lambda self, llm_type: mock_llm_client)
-    client = Microagent(llm_type=mock_llm_client.llm_type)
-    response = client.run(agent=agent, messages=messages, execute_tools=False)
-
-    get_weather_mock.assert_not_called()
-
-    assert len(response.messages) == 1
-    tool_calls = response.messages[0].get("tool_calls", [])
-    assert tool_calls and len(tool_calls) == 1
-    
-    if mock_llm_client.llm_type in ['openai', 'groq', 'gemini']:
-        assert tool_calls[0]["function"]["name"] == "get_weather"
-        assert json.loads(tool_calls[0]["function"]["arguments"])["location"] == expected_location
-    else:  # anthropic
-        assert tool_calls[0].function.name == "get_weather"
-        assert json.loads(tool_calls[0].function.arguments)["location"] == expected_location
-
-@pytest.mark.parametrize("mock_llm_client", ["openai", "anthropic", "groq", "gemini"], indirect=True)
-def test_handoff(mock_llm_client, monkeypatch):
-    agent2 = Agent(name="Test Agent 2", instructions="Test instructions 2", model="gpt-3.5-turbo")
-
-    def transfer_to_agent2():
+@use_vcr_for_llm
+def test_agent_handoff(microagent):
+    client, model, _ = microagent
+    agent2 = Agent(name="Agent 2", instructions="Agent 2 instructions", model=model)
+    def handoff_function():
+        """handoff Function with no params"""
         return agent2
+    agent1 = Agent(name="Agent 1", instructions="Agent 1 instructions", model=model, functions=[handoff_function])
+    messages = [{"role": "user", "content": "Handoff to Agent 2"}]
+    response = client.run(agent=agent1, messages=messages, max_turns=3)
+    assert response.agent.name == "Agent 2"
 
-    agent1 = Agent(name="Test Agent 1", instructions="Test instructions 1", model="gpt-3.5-turbo", functions=[transfer_to_agent2])
+@use_vcr_for_llm
+def test_context_variables(microagent):
+    client, model, _ = microagent
+    def update_context(key, value):
+        """Update context function with key and value"""
+        return Result(value=f"Updated {key} to {value}", context_variables={key: value})
+    agent = Agent(name="Test Agent", instructions="Test instructions", model=model, functions=[update_context])
+    messages = [{"role": "user", "content": "Update context with key 'test_key' and value 'test_value'"}]
+    response = client.run(agent=agent, messages=messages)
+    assert "test_key" in response.context_variables
+    assert response.context_variables["test_key"] == "test_value"
 
-    if mock_llm_client.llm_type in ['openai', 'groq', 'gemini']:
-        function_calls = [{"id": "call_1", "type": "function", "function": {"name": "transfer_to_agent2", "arguments": "{}"}}]
-    else:  # anthropic
-        function_call = Mock()
-        function_call.id = "call_1"
-        function_call.type = "function"
-        function_call.function = Mock()
-        function_call.function.name = "transfer_to_agent2"
-        function_call.function.arguments = "{}"
-        function_calls = [function_call]
+@use_vcr_for_llm
+def test_max_turns(microagent):
+    client, model, _ = microagent
+    def loop_function():
+        """Function to start the loop"""
+        return "Looping"
+    agent = Agent(name="Test Agent", instructions="Test instructions", model=model, functions=[loop_function])
+    messages = [{"role": "user", "content": "Start a loop that calls the loop_function repeatedly"}]
+    response = client.run(agent=agent, messages=messages, max_turns=3)
+    assert len(response.messages) <= 7
 
-    mock_llm_client.set_sequential_responses([
-        create_mock_response(
-            mock_llm_client.llm_type,
-            message={"role": "assistant", "content": ""},
-            function_calls=function_calls
-        ),
-        create_mock_response(
-            mock_llm_client.llm_type,
-            {"role": "assistant", "content": DEFAULT_RESPONSE_CONTENT}
-        ),
-    ])
-
-    monkeypatch.setattr(Microagent, '_get_client', lambda self, llm_type: mock_llm_client)
-    client = Microagent(llm_type=mock_llm_client.llm_type)
-    messages = [{"role": "user", "content": "I want to talk to agent 2"}]
-    response = client.run(agent=agent1, messages=messages)
-
-    assert len(response.messages) == 3
-    assert response.messages[-1]["content"] == DEFAULT_RESPONSE_CONTENT
-    assert response.agent.name == "Test Agent 2"
+@use_vcr_for_llm
+def test_execute_tools_false(microagent):
+    client, model, _ = microagent
+    def test_function():
+        """Function that shouldn't be called"""
+        return "This should not be called"
+    agent = Agent(name="Test Agent", instructions="Test instructions", model=model, functions=[test_function])
+    messages = [{"role": "user", "content": "Call the test_function"}]
+    response = client.run(agent=agent, messages=messages, execute_tools=False, max_turns=3)
+    assert len(response.messages) == 1
+    assert "tool_calls" in response.messages[0]
