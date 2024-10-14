@@ -88,7 +88,7 @@ class AnthropicClient(LLMClient):
         }
     
     def prepare_chat_params(self, **kwargs) -> Dict[str, Any]:
-        print(json.dumps(kwargs['messages'], indent=4))
+        
         params = {
             "model": kwargs.get('model', self.default_model),
             "max_tokens": kwargs.get('max_tokens', self.default_max_tokens),
@@ -104,6 +104,7 @@ class AnthropicClient(LLMClient):
         if params['messages'] and params['messages'][0]['role'] == 'system':
             system_message = params['messages'].pop(0)
             params['system'] = [{"type": "text", "text": system_message['content']}]
+        
         
         return params
     

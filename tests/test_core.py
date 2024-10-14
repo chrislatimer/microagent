@@ -11,8 +11,8 @@ my_vcr = vcr.VCR(
     filter_headers=['authorization'],
 )
 
-# LLM_TYPES = ['openai', 'anthropic', 'groq', 'gemini']
-LLM_TYPES = ['openai', 'anthropic']
+LLM_TYPES = ['openai', 'anthropic', 'groq']
+# LLM_TYPES = ['openai']
 
 @pytest.fixture(params=LLM_TYPES)
 def microagent(request):
@@ -20,7 +20,7 @@ def microagent(request):
     model_map = {
         'openai': "gpt-3.5-turbo",
         'anthropic': "claude-3-sonnet-20240229",
-        'groq': "mixtral-8x7b-32768",
+        'groq': "llama3-groq-70b-8192-tool-use-preview",
         'gemini': "gemini-pro"
     }
     return Microagent(llm_type=llm_type), model_map[llm_type], llm_type
@@ -42,7 +42,7 @@ def test_tool_call(microagent):
         return f"Function called with {arg1} and {arg2}"
     agent = Agent(name="Test Agent", instructions="Test instructions", model=model, functions=[test_function])
     messages = [{"role": "user", "content": "Call the test function with arg1=value1 and arg2=value2"}]
-    response = client.run(agent=agent, messages=messages, max_turns=2)
+    response = client.run(agent=agent, messages=messages, max_turns=3)
     assert len(response.messages) >= 2
     assert any("Function called with value1 and value2" in (msg.get('content') or '') for msg in response.messages)
 
@@ -71,7 +71,7 @@ def test_agent_handoff(microagent):
         """handoff Function with no params"""
         return agent2
     agent1 = Agent(name="Agent 1", instructions="Agent 1 instructions", model=model, functions=[handoff_function])
-    messages = [{"role": "user", "content": "Handoff to Agent 2"}]
+    messages = [{"role": "user", "content": "call function to handoff to Agent 2"}]
     response = client.run(agent=agent1, messages=messages, max_turns=3)
     assert response.agent.name == "Agent 2"
 

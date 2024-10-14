@@ -10,7 +10,8 @@ class OpenAIClient:
             del kwargs['tools']
         if 'model' not in kwargs:
             kwargs['model'] = 'gpt-3.5-turbo'  # Default model
-        response = self.client.chat.completions.create(messages=messages, **kwargs)
+        params = self.prepare_chat_params(messages=messages, **kwargs)
+        response = self.client.chat.completions.create( **params)
         return self.parse_response(response)
 
     def stream_chat_completion(self, messages: List[Dict[str, Any]], **kwargs) -> Any:
@@ -68,23 +69,15 @@ class OpenAIClient:
                 for message in kwargs['messages']
             ],
         }
-        if 'tools' in kwargs:
+        if 'tools' in kwargs and kwargs['tools']:  # Check if tools exist and are not empty
             params["tools"] = kwargs['tools']
-        if 'tool_choice' in kwargs:
-            params["tool_choice"] = kwargs['tool_choice']
+            if 'tool_choice' in kwargs:  # Only add tool_choice if tools exist
+                params["tool_choice"] = kwargs['tool_choice']
+
+        print("params")
+        print(params)
         return params
 
-    # def prepare_chat_params(self, **kwargs) -> Dict[str, Any]:
-    #     params = {
-    #         "model": kwargs.get('model', 'gpt-3.5-turbo'),
-    #         "messages": kwargs['messages'],
-    #     }
-    #     if 'tools' in kwargs:
-    #         params["tools"] = [{"type": "function", "function": tool} for tool in self.prepare_tools(kwargs['tools'])]
-    #     if 'tool_choice' in kwargs:
-    #         params["tool_choice"] = kwargs['tool_choice']
-    #     return params
-    
     def prepare_system_message(self, instructions: str) -> Dict[str, Any]:
         return {"role": "system", "content": instructions}
 

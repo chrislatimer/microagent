@@ -25,15 +25,13 @@ class Microagent:
             "model": model_override or agent.model,
             "messages": messages,
             "tools": tools,
-            "tool_choice": agent.tool_choice,
+            "tool_choice": agent.tool_choice if agent.tool_choice is not None else "auto",
         }
 
-        prepared_params = self.client.prepare_chat_params(**params)
-
         if stream:
-            return self.client.stream_chat_completion(**prepared_params)
+            return self.client.stream_chat_completion(**params)
         else:
-            return self.client.chat_completion(**prepared_params)
+            return self.client.chat_completion(**params)
 
     def _prepare_messages(self, agent: Agent, history: List[Dict[str, Any]], context_variables: Dict[str, Any], debug: bool) -> List[Dict[str, Any]]:
         instructions = agent.instructions(context_variables) if callable(agent.instructions) else agent.instructions
@@ -41,6 +39,7 @@ class Microagent:
         messages = [system_message] + history
         debug_print(debug, "Using instructions:", instructions)
         debug_print(debug, "Getting chat completion for:", messages)
+
         return messages
 
     def _prepare_tools(self, agent: Agent, debug: bool) -> List[Dict[str, Any]]:
@@ -140,6 +139,8 @@ class Microagent:
                 stream=stream,
                 debug=debug
             )
+
+            print(completion)
             
             # Parse response
             message = self.client.parse_response(completion)

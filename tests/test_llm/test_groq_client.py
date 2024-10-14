@@ -16,7 +16,7 @@ def groq_client():
 @my_vcr.use_cassette('test_groq_chat_completion.yaml')
 def test_chat_completion(groq_client):
     messages = [{"role": "user", "content": "Say this is a test"}]
-    response = groq_client.chat_completion(messages, model="mixtral-8x7b-32768")
+    response = groq_client.chat_completion(messages, model="llama3-groq-70b-8192-tool-use-preview")
 
     assert isinstance(response, dict)
     assert "content" in response
@@ -26,7 +26,7 @@ def test_chat_completion(groq_client):
 @my_vcr.use_cassette('test_groq_stream_chat_completion.yaml')
 def test_stream_chat_completion(groq_client):
     messages = [{"role": "user", "content": "Say this is a test"}]
-    stream = groq_client.stream_chat_completion(messages, model="mixtral-8x7b-32768")
+    stream = groq_client.stream_chat_completion(messages, model="llama3-groq-70b-8192-tool-use-preview")
 
     assert hasattr(stream, '__iter__')
     
