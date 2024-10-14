@@ -59,10 +59,6 @@ response = client.run(
 print(response.messages[-1]["content"])
 ```
 
-## Documentation
-
-For full documentation, including detailed API references and advanced usage examples, please visit our [documentation site](https://microagent.readthedocs.io).
-
 ## Acknowledgments
 
 Microagent builds upon the innovative work done by OpenAI in their Swarm project. We are grateful for their contributions to the field of multi-agent systems and open-source AI development.
