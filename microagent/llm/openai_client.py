@@ -74,8 +74,6 @@ class OpenAIClient:
             if 'tool_choice' in kwargs:  # Only add tool_choice if tools exist
                 params["tool_choice"] = kwargs['tool_choice']
 
-        print("params")
-        print(params)
         return params
 
     def prepare_system_message(self, instructions: str) -> Dict[str, Any]:

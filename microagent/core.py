@@ -139,8 +139,6 @@ class Microagent:
                 stream=stream,
                 debug=debug
             )
-
-            print(completion)
             
             # Parse response
             message = self.client.parse_response(completion)

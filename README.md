@@ -23,7 +23,7 @@ Microagent focuses on providing a simple yet powerful interface for creating and
 ## Installation
 
 ```shell
-pip install git+https://github.com/yourusername/microagent.git
+pip install git+https://github.com/chrislatimer/microagent.git
 ```
 
 ## Quick Start
@@ -31,18 +31,25 @@ pip install git+https://github.com/yourusername/microagent.git
 ```python
 from microagent import Microagent, Agent
 
-client = Microagent()
+client = Microagent(llm_type='openai')
 
 agent_a = Agent(
     name="Agent A",
     instructions="You are a helpful agent.",
-    functions=[lambda: agent_b]
+    model="gpt-3.5-turbo",
 )
 
 agent_b = Agent(
     name="Agent B",
     instructions="You specialize in concise responses.",
+    model="gpt-3.5-turbo",
 )
+
+def transfer_to_concise_agent():
+    """Transfer spanish speaking users immediately."""
+    return agent_b
+
+agent_a.functions.append(transfer_to_concise_agent)
 
 response = client.run(
     agent=agent_a,
