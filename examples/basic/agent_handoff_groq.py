@@ -35,4 +35,4 @@ response = client.run(agent=english_agent, messages=messages)
 print(response.messages[-1]["content"])
 
 if __name__ == "__main__":
-    run_demo_loop(english_agent, llm_type='groq', debug=True)
+    run_demo_loop(english_agent, llm_type='groq')
